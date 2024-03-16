@@ -14,18 +14,18 @@ import threading
 class RoverControlApp:
     def __init__(self, root):
         self.root = root
-        self.setup_gui()
         self.device_address = None
         self.client = None
-
+        self.led_state = False  # False means LED is OFF, True means ON
+        self.setup_gui()
+        # Example UUID for the rover's command characteristic
         self.command_characteristic_uuid = "0000ffe1-0000-1000-8000-00805f9b34fb"
 
     def setup_gui(self):
         self.root.title("ROVER 11 Control Manager")
         self.root.configure(background="black")
-        self.root.geometry("400x200")
+        self.root.geometry("400x300")  # Adjusted for LED status
 
-        # Font similar to VS Code's default
         self.font = ("Consolas", 12)
 
         self.scan_button = tk.Button(self.root, text="Scan for Devices", font=self.font, bg="black", fg="white", command=self.scan_for_devices)
@@ -36,6 +36,9 @@ class RoverControlApp:
 
         self.direction_label = tk.Label(self.root, text="Direction: N/A", font=self.font, bg="black", fg="white")
         self.direction_label.pack(pady=10)
+
+        self.led_status_label = tk.Label(self.root, text="LED: OFF", font=self.font, bg="black", fg="white")
+        self.led_status_label.pack(pady=10)
 
     async def discover_devices(self):
         devices = await BleakScanner.discover()
@@ -48,6 +51,7 @@ class RoverControlApp:
 
     def scan_for_devices(self):
         threading.Thread(target=lambda: asyncio.run(self.discover_devices()), daemon=True).start()
+
 
     async def connect_to_device(self):
         self.client = BleakClient(self.device_address)
@@ -64,23 +68,39 @@ class RoverControlApp:
             "s": "Backward",
             "d": "Right",
         }
-        direction_key = direction.lower()
-        if direction_key in directions:
-            self.direction_label.config(text=f"Direction: {directions[direction_key]}")
+        if direction.lower() in directions:
+            self.direction_label.config(text=f"Direction: {directions[direction.lower()]}")
             # Send command to the rover
-            if self.client and self.client.is_connected:
-                asyncio.run(self.client.write_gatt_char(self.command_characteristic_uuid, direction.encode()))
+            self.send_command(direction.lower())
+        elif direction.lower() == "l":
+            self.toggle_led()
         else:
             self.direction_label.config(text="Direction: N/A")
 
+    def update_led(self):
+        self.led_state = not self.led_state
+        led_status = "ON" if self.led_state else "OFF"
+        self.led_status_label.config(text=f"LED: {led_status}")
+        # Send "l" command to the rover to toggle LED
+        self.send_command("l")
+
+    def send_command(self, command):
+        # Check if client is connected and send command
+        if self.client and self.client.is_connected:
+            asyncio.run(self.client.write_gatt_char(self.command_characteristic_uuid, command.encode()))
+
+
 def on_key_event(event):
-    direction = {
-        "w": "Forward",
-        "a": "Left",
-        "s": "Backward",
-        "d": "Right",
-    }.get(event.name, "N/A")
-    app.update_direction(direction)
+    if event.name in ["w", "a", "s", "d"]:
+        direction = {
+            "w": "Forward",
+            "a": "Left",
+            "s": "Backward",
+            "d": "Right",
+        }.get(event.name, "N/A")
+        app.update_direction(event.name)  # Directly pass the key for direction control
+    elif event.name == "l":  # Use the new method for LED control
+        app.update_led()
 
 def main():
     global app
