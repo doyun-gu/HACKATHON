@@ -1,0 +1,6 @@
+### Arduino Settings
+
+1. Tool/Upload SPeed/11520 gives better video quality in general
+2. Tool/Board Selection/ESP21/DOIT ESP32 DEVKIT V1
+3. Tool/COM/Right COM Number
+
