@@ -4,6 +4,9 @@ from tkinter import ttk
 from bleak import BleakScanner, BleakClient
 import keyboard
 import threading
+import cv2
+from PIL import Image, ImageTk
+import time
 
 # This code is to control the rover robot via bluetooth
 # Keyboard (w, a, s, d) is used to control the robot
@@ -24,7 +27,13 @@ class RoverControlApp:
     def setup_gui(self):
         self.root.title("ROVER 11 Control Manager")
         self.root.configure(background="black")
-        self.root.geometry("400x300")  # Adjusted for LED status
+
+        # Geometry
+        self.root.geometry("800x600")
+        
+        # Set up the video frame
+        self.video_label = tk.Label(self.root)
+        self.video_label.pack()
 
         self.font = ("Consolas", 12)
 
@@ -89,6 +98,39 @@ class RoverControlApp:
         if self.client and self.client.is_connected:
             asyncio.run(self.client.write_gatt_char(self.command_characteristic_uuid, command.encode()))
 
+    def stream_video(self, video_url):
+        while True:
+            cap = cv2.VideoCapture(video_url)
+            if not cap.isOpened():
+                print("Unable to connect to camera. Retrying in 5 seconds...")
+                time.sleep(5)
+                continue
+
+            while True:
+                ret, frame = cap.read()
+
+                if ret:
+                    # Resize frame to fit the application window
+                    frame = cv2.resize(frame, (320, 240))  # Adjust size as needed
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    im = Image.fromarray(frame)
+                    img = ImageTk.PhotoImage(image=im)
+
+                    self.video_label.configure(image=img)
+                    self.video_label.image = img
+
+                else:
+                    print("Failed to grab frame. Reconnecting...")
+                    break  # Break the inner loop to attempt reconnection
+
+                cv2.waitKey(30)
+            cap.release()  # Release the capture before reconnecting
+
+
+    def start_video_stream(self):
+        video_url = "http://192.168.137.233/"
+        threading.Thread(target=self.stream_video, args=(video_url,), daemon=True).start()
+
 
 def on_key_event(event):
     if event.name in ["w", "a", "s", "d"]:
@@ -106,6 +148,7 @@ def main():
     global app
     root = tk.Tk()
     app = RoverControlApp(root)
+    app.start_video_stream()
     keyboard.on_press(on_key_event)
     root.mainloop()
 
