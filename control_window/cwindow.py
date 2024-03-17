@@ -52,7 +52,7 @@ class RoverControlApp:
     async def discover_devices(self):
         devices = await BleakScanner.discover()
         for device in devices:
-            if device.name == "rover11":
+            if device.name == "ROVER_11":
                 self.device_address = device.address
                 break
         if self.device_address:
